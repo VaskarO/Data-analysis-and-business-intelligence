@@ -1,25 +1,47 @@
 import os
 import time
+import pickle
 import langchain
 from langchain import OpenAI
 from langchain.document_loaders import UnstructuredURLLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import FAISS
+import streamlit as st
 
-os.environ['OPENAI_API_KEY'] = 'open ai key'
-llm = OpenAI(temprature=0.9, max_tokens = 500)
 
-loaders =  UnstructuredURLLoader(urls= ['url1', 'url2'])
+from dotenv import load_dotenv
+load_dotenv() 
+st.title("News Research LLM application")
+st.sidebar.title("News Article URLs")
 
-data = loaders.load()
+urls = []
+for i in range(3):
+    url = st.sidebar.text_input(f"URL {i+1}")
+    urls.append(url)
 
-text_spliter = RecursiveCharacterTextSplitter(
-    chunk_size = 1000,
-    chunk_overlap= 200
-)
+process_url_clicked = st.sidebar.button("Process URLs")
+file_path = "faiss_store_openai.pkl"
 
-docs = text_spliter.split_documents(data)
+main_placeholder = st.empty()
+llm = OpenAI(temperature=0.9, max_tokens=500)
 
-embeddings = OpenAIEmbeddings()
-vectorindex_openai = FAISS.from_docuemnts(docs, embeddings)
+if process_url_clicked:
+    loader = UnstructuredURLLoader(urls=urls)
+    main_placeholder.text("Data Loading..")
+    data = loader.load()
+    text_splitter = RecursiveCharacterTextSplitter(
+        separators=['\n\n', '\n', '.', ','],
+        chunk_size=1000
+    )
+    main_placeholder.text("Splitting Text")
+    docs = text_splitter.split_documents(data)
+    embeddings = OpenAIEmbeddings()
+    vectorstore_openai = FAISS.from_documents(docs, embeddings)
+    main_placeholder.text("Embedding Vector Started ")
+    time.sleep(2)
+
+    with open(file_path, "wb") as f:
+        pickle.dump(vectorstore_openai, f)
+
+query = main_placeholder.text_input("Question: ")
