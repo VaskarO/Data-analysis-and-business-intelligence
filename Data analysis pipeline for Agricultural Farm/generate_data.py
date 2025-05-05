@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 fake = Faker()
 
-# Set random seed for generating same data each time 
+# Set seeds for reproducibility
 Faker.seed(42)
 np.random.seed(42)
 random.seed(42)
@@ -14,18 +14,20 @@ random.seed(42)
 NUM_PRODUCTIONS = 15000
 NUM_SALES = 7500  # allow multiple sales per production
 
-# Sample values for realism
+# Sample values
 crop_types = ['Wheat', 'Corn', 'Barley', 'Soybean', 'Potato']
-varieties = {'Wheat': ['Durum', 'Emmer'], 'Corn': ['Sweet', 'Dent'], 'Barley': ['Hulled', 'Hulless'],
-             'Soybean': ['Yellow', 'Black'], 'Potato': ['Russet', 'Red']}
-
+varieties = {
+    'Wheat': ['Durum', 'Emmer'],
+    'Corn': ['Sweet', 'Dent'],
+    'Barley': ['Hulled', 'Hulless'],
+    'Soybean': ['Yellow', 'Black'],
+    'Potato': ['Russet', 'Red']
+}
 fertilizers = ['NPK 15-15-15', 'Urea', 'Compost']
 pesticides = ['Glyphosate', 'Chlorpyrifos', 'Neem Oil']
 irrigation_types = ['Drip', 'Sprinkler', 'Flood']
-
 buyer_types = ['Retailer', 'Wholesaler', 'Exporter']
 channel_types = ['Direct', 'Online', 'Cooperative']
-
 regions = ['Bavaria', 'Brandenburg', 'Saxony', 'Hesse', 'Lower Saxony']
 
 def generate_production_data():
@@ -34,10 +36,14 @@ def generate_production_data():
         crop = random.choice(crop_types)
         variety = random.choice(varieties[crop])
         planting_date = fake.date_between(start_date='-2y', end_date='-6m')
-        harvest_date = planting_date + timedelta(days=random.randint(90, 160))
+        
+        harvest_raw = planting_date + timedelta(days=random.randint(90, 160))
+        harvest_date = min(harvest_raw, datetime.today().date())
+        
         yield_kg = random.uniform(1000, 10000)
-        avg_yield = yield_kg / random.uniform(0.5, 2.5)  # yield per hectare
+        avg_yield = yield_kg / random.uniform(0.5, 2.5)
         expected_price = round(random.uniform(0.3, 1.5), 2)
+        
         records.append({
             'production_id': i,
             'farm_name': fake.company(),
@@ -70,6 +76,9 @@ def generate_sales_data(production_df):
     records = []
     for i in range(1, NUM_SALES + 1):
         prod = production_df.sample(1).iloc[0]
+        
+        harvest_date = pd.to_datetime(prod['harvest_date']).date()
+        
         crop = prod['crop_type']
         variety = prod['crop_variety']
         market_price = prod['expected_market_price_per_kg']
@@ -79,6 +88,7 @@ def generate_sales_data(production_df):
         discount = round(random.uniform(0, 50), 2)
         shipping = round(random.uniform(10, 100), 2)
         net = revenue - discount - shipping
+        
         records.append({
             'sales_id': i,
             'production_id': prod['production_id'],
@@ -88,7 +98,7 @@ def generate_sales_data(production_df):
             'buyer_type': random.choice(buyer_types),
             'buyer_region': random.choice(regions),
             'channel_type': random.choice(channel_types),
-            'transaction_date': fake.date_between(start_date=prod['harvest_date'], end_date='today'),
+            'transaction_date': fake.date_between(start_date=harvest_date, end_date='today'),
             'quantity_sold_kg': quantity,
             'unit_price_eur': actual_price,
             'total_revenue_eur': revenue,
@@ -101,15 +111,15 @@ def generate_sales_data(production_df):
         })
     return pd.DataFrame(records)
 
-# now generating the data
+# Generate and save data
 production_df = generate_production_data()
 sales_df = generate_sales_data(production_df)
 
 production_df.to_csv('fact_production.csv', index=False)
 sales_df.to_csv('fact_sales.csv', index=False)
 
+# Print sample output
 print("Production Sample:")
 print(production_df.head())
 print("\nSales Sample:")
 print(sales_df.head())
-
